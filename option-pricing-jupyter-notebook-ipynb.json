@@ -1,0 +1,273 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Option Pricing and Risk Management Portfolio\n",
+    "\n",
+    "This notebook demonstrates a comprehensive understanding of option pricing and risk management techniques, progressing from fundamental concepts to advanced models."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import numpy as np\n",
+    "import scipy.stats as st\n",
+    "import matplotlib.pyplot as plt\n",
+    "\n",
+    "class OptionType:\n",
+    "    CALL = 1\n",
+    "    PUT = -1"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 1. Foundations: The Black-Scholes Model"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def BS_Call_Put_Option_Price(CP, S_0, K, sigma, t, T, r):\n",
+    "    K = np.array(K).reshape([len(K),1])\n",
+    "    d1 = (np.log(S_0 / K) + (r + 0.5 * sigma**2) * (T-t)) / (sigma * np.sqrt(T-t))\n",
+    "    d2 = d1 - sigma * np.sqrt(T-t)\n",
+    "    if CP == OptionType.CALL:\n",
+    "        value = st.norm.cdf(d1) * S_0 - st.norm.cdf(d2) * K * np.exp(-r * (T-t))\n",
+    "    elif CP == OptionType.PUT:\n",
+    "        value = st.norm.cdf(-d2) * K * np.exp(-r * (T-t)) - st.norm.cdf(-d1)*S_0\n",
+    "    return value\n",
+    "\n",
+    "# Example usage\n",
+    "S0 = 100\n",
+    "K = np.linspace(80, 120, 41)\n",
+    "r = 0.05\n",
+    "T = 1\n",
+    "sigma = 0.2\n",
+    "\n",
+    "call_prices = BS_Call_Put_Option_Price(OptionType.CALL, S0, K, sigma, 0, T, r)\n",
+    "put_prices = BS_Call_Put_Option_Price(OptionType.PUT, S0, K, sigma, 0, T, r)\n",
+    "\n",
+    "plt.figure(figsize=(10, 6))\n",
+    "plt.plot(K, call_prices, label='Call Option')\n",
+    "plt.plot(K, put_prices, label='Put Option')\n",
+    "plt.xlabel('Strike Price')\n",
+    "plt.ylabel('Option Price')\n",
+    "plt.title('Black-Scholes Option Prices')\n",
+    "plt.legend()\n",
+    "plt.grid(True)\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Analysis\n",
+    "\n",
+    "Discuss the shape of the option price curves and how they relate to the payoff structures of calls and puts. Consider how changes in volatility, interest rates, and time to maturity would affect these curves."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 2. Beyond Black-Scholes: Monte Carlo Simulation"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def GeneratePathsGBMEuler(NoOfPaths, NoOfSteps, T, r, sigma, S_0):    \n",
+    "    Z = np.random.normal(0.0, 1.0, [NoOfPaths, NoOfSteps])\n",
+    "    W = np.zeros([NoOfPaths, NoOfSteps+1])\n",
+    "   \n",
+    "    S = np.zeros([NoOfPaths, NoOfSteps+1])\n",
+    "    S[:,0] = S_0\n",
+    "    \n",
+    "    dt = T / float(NoOfSteps)\n",
+    "    for i in range(0, NoOfSteps):\n",
+    "        if NoOfPaths > 1:\n",
+    "            Z[:,i] = (Z[:,i] - np.mean(Z[:,i])) / np.std(Z[:,i])\n",
+    "        W[:,i+1] = W[:,i] + np.power(dt, 0.5)*Z[:,i]\n",
+    "        S[:,i+1] = S[:,i] + r * S[:,i] * dt + sigma * S[:,i] * (W[:,i+1] - W[:,i])\n",
+    "        \n",
+    "    return {\"time\": np.linspace(0, T, NoOfSteps+1), \"S\": S}\n",
+    "\n",
+    "def EUOptionPriceFromMCPathsGeneralized(CP, S, K, T, r):\n",
+    "    if CP == OptionType.CALL:\n",
+    "        return np.exp(-r*T)*np.mean(np.maximum(S-K,0.0))\n",
+    "    elif CP == OptionType.PUT:\n",
+    "        return np.exp(-r*T)*np.mean(np.maximum(K-S,0.0))\n",
+    "\n",
+    "# Example usage\n",
+    "NoOfPaths = 10000\n",
+    "NoOfSteps = 252\n",
+    "S0 = 100\n",
+    "K = 100\n",
+    "r = 0.05\n",
+    "T = 1\n",
+    "sigma = 0.2\n",
+    "\n",
+    "paths = GeneratePathsGBMEuler(NoOfPaths, NoOfSteps, T, r, sigma, S0)\n",
+    "S_T = paths[\"S\"][:,-1]\n",
+    "\n",
+    "MC_call_price = EUOptionPriceFromMCPathsGeneralized(OptionType.CALL, S_T, K, T, r)\n",
+    "BS_call_price = BS_Call_Put_Option_Price(OptionType.CALL, S0, [K], sigma, 0, T, r)[0]\n",
+    "\n",
+    "print(f\"Monte Carlo Call Price: {MC_call_price}\")\n",
+    "print(f\"Black-Scholes Call Price: {BS_call_price}\")\n",
+    "\n",
+    "plt.figure(figsize=(10, 6))\n",
+    "plt.hist(S_T, bins=50, density=True, alpha=0.7)\n",
+    "plt.title('Distribution of Final Stock Prices')\n",
+    "plt.xlabel('Stock Price')\n",
+    "plt.ylabel('Frequency')\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Analysis\n",
+    "\n",
+    "Compare the Monte Carlo result with the Black-Scholes price. Discuss the advantages and limitations of the Monte Carlo method, including its flexibility and computational intensity."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 3. Risk Management: Greeks and Hedging"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def BS_Delta(CP, S_0, K, sigma, tau, r):\n",
+    "    d1 = (np.log(S_0 / K) + (r + 0.5 * sigma**2) * tau) / (sigma * np.sqrt(tau))\n",
+    "    if CP == OptionType.CALL:\n",
+    "        return st.norm.cdf(d1)\n",
+    "    elif CP == OptionType.PUT:\n",
+    "        return st.norm.cdf(d1) - 1.0\n",
+    "\n",
+    "def BS_Gamma(S_0, K, sigma, tau, r):\n",
+    "    d1 = (np.log(S_0 / K) + (r + 0.5 * sigma**2) * tau) / (sigma * np.sqrt(tau))\n",
+    "    return st.norm.pdf(d1) / (S_0 * sigma * np.sqrt(tau))\n",
+    "\n",
+    "def BS_Vega(S_0, K, sigma, tau, r):\n",
+    "    d1 = (np.log(S_0 / K) + (r + 0.5 * sigma**2) * tau) / (sigma * np.sqrt(tau))\n",
+    "    return S_0 * st.norm.pdf(d1) * np.sqrt(tau)\n",
+    "\n",
+    "def delta_hedge_simulation(S0, K, T, r, sigma, NoOfPaths, NoOfSteps):\n",
+    "    paths = GeneratePathsGBMEuler(NoOfPaths, NoOfSteps, T, r, sigma, S0)\n",
+    "    S = paths[\"S\"]\n",
+    "    time = paths[\"time\"]\n",
+    "    \n",
+    "    PnL = np.zeros([NoOfPaths, NoOfSteps+1])\n",
+    "    delta = np.zeros([NoOfPaths, NoOfSteps+1])\n",
+    "    \n",
+    "    for i in range(NoOfSteps):\n",
+    "        delta_curr = BS_Delta(OptionType.CALL, S[:,i], K, sigma, T-time[i], r)\n",
+    "        if i > 0:\n",
+    "            PnL[:,i] = PnL[:,i-1] + delta[:,i-1] * (S[:,i] - S[:,i-1])\n",
+    "        delta[:,i] = delta_curr\n",
+    "    \n",
+    "    # Final payoff\n",
+    "    PnL[:,-1] = PnL[:,-2] + delta[:,-2] * (S[:,-1] - S[:,-2]) - np.maximum(S[:,-1] - K, 0)\n",
+    "    \n",
+    "    return PnL\n",
+    "\n",
+    "# Example usage\n",
+    "S0 = 100\n",
+    "K = 100\n",
+    "T = 1\n",
+    "r = 0.05\n",
+    "sigma = 0.2\n",
+    "NoOfPaths = 1000\n",
+    "NoOfSteps = 252\n",
+    "\n",
+    "PnL = delta_hedge_simulation(S0, K, T, r, sigma, NoOfPaths, NoOfSteps)\n",
+    "\n",
+    "plt.figure(figsize=(10, 6))\n",
+    "plt.hist(PnL[:,-1], bins=50)\n",
+    "plt.title('Distribution of P&L from Delta Hedging')\n",
+    "plt.xlabel('P&L')\n",
+    "plt.ylabel('Frequency')\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Analysis\n",
+    "\n",
+    "Discuss the effectiveness of delta hedging based on the P&L distribution. Consider the impact of discrete hedging and how transaction costs might affect the strategy in practice."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 4. Exotic Options: Expanding the Toolkit"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def AsianOptionMC(S_paths, K, r, T):\n",
+    "    A_T = np.mean(S_paths, axis=1)\n",
+    "    payoff = np.maximum(A_T - K, 0)\n",
+    "    return np.exp(-r * T) * np.mean(payoff)\n",
+    "\n",
+    "def UpAndOutBarrier(S, T, r, payoff, Su):\n",
+    "    hitM = S > Su\n",
+    "    hitVec = np.sum(hitM, axis=1) == 0\n",
+    "    return np.exp(-r * T) * np.mean(payoff(S[:, -1]) * hitVec)\n",
+    "\n",
+    "# Example usage\n",
+    "S0 = 100\n",
+    "K = 100\n",
+    "T = 1\n",
+    "r = 0.05\n",
+    "sigma = 0.2\n",
+    "Su = 130  # Barrier for up-and-out option\n",
+    "NoOfPaths = 10000\n",
+    "NoOfSteps = 252\n",
+    "\n",
+    "paths = GeneratePathsGBMEuler(NoOfPaths, NoOfSteps, T, r, sigma, S0)\n",
+    "S_paths = paths[\"S\"]\n",
+    "\n",
+    "asian_price = AsianOptionMC(S_paths, K, r, T)\n",
+    "barrier_price = UpAndOutBarrier(S_paths, T, r, lambda x: np.maximum(x - K, 0), Su)\n",
+    "vanilla_price = BS_Call_Put_Option_Price(OptionType.CALL, S0, [K], sigma, 0, T, r)[0]\n",
+    "\n",
+    "print(f\"Asian Option Price: {asian_price}\")\n",
+    "print(f\"Up-and-Out Barrier Option Price: {barrier_price}\")\n",
+    "print(f\"Vanilla Call Option Price: {vanilla_price}\")\n",
+    "\n",
+    "plt.figure(figsize=(10, 6))\n",
+    "plt.plot(paths[\"time\"], S_paths[0:5].T)\n",
+    "plt.axhline(y=Su, color='r', linestyle='--', label='Barrier')\n",
+    "plt.title('Sample Stock Price Paths with Barrier')\n",
+    "

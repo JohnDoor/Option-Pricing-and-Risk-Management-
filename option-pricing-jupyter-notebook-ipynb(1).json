@@ -1,0 +1,139 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "plt.xlabel('Time')\n",
+    "plt.ylabel('Stock Price')\n",
+    "plt.legend()\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Analysis\n",
+    "\n",
+    "Compare the prices of Asian and barrier options to vanilla options. Discuss how path dependency affects option prices and the advantages of Monte Carlo simulation for pricing these exotic options."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 5. Advanced Models: Stochastic Volatility and Jumps"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def ChFHestonModel(r, tau, kappa, gamma, vbar, v0, rho):\n",
+    "    i = np.complex(0.0, 1.0)\n",
+    "    D1 = lambda u: np.sqrt(np.power(kappa-gamma*rho*i*u, 2) + (u*u+i*u)*gamma*gamma)\n",
+    "    g  = lambda u: (kappa-gamma*rho*i*u-D1(u))/(kappa-gamma*rho*i*u+D1(u))\n",
+    "    C  = lambda u: (1.0-np.exp(-D1(u)*tau))/(gamma*gamma*(1.0-g(u)*np.exp(-D1(u)*tau)))*(kappa-gamma*rho*i*u-D1(u))\n",
+    "    A  = lambda u: r*i*u*tau + kappa*vbar*tau/gamma/gamma *(kappa-gamma*rho*i*u-D1(u)) - 2*kappa*vbar/gamma/gamma*np.log((1.0-g(u)*np.exp(-D1(u)*tau))/(1.0-g(u)))\n",
+    "    \n",
+    "    cf = lambda u: np.exp(A(u) + C(u)*v0)\n",
+    "    return cf \n",
+    "\n",
+    "def ChFBatesModel(r, tau, kappa, gamma, vbar, v0, rho, xiP, muJ, sigmaJ):\n",
+    "    chi_h = ChFHestonModel(r, tau, kappa, gamma, vbar, v0, rho)\n",
+    "    i = np.complex(0.0, 1.0)\n",
+    "    jump_component = lambda u: np.exp(i*u*muJ - 0.5*sigmaJ*sigmaJ*u*u)\n",
+    "    cf = lambda u: chi_h(u) * np.exp(xiP * tau * (jump_component(u) - 1))\n",
+    "    return cf\n",
+    "\n",
+    "# Example usage\n",
+    "S0 = 100\n",
+    "r = 0.05\n",
+    "T = 1\n",
+    "kappa = 1.5\n",
+    "gamma = 0.3\n",
+    "vbar = 0.04\n",
+    "v0 = 0.04\n",
+    "rho = -0.7\n",
+    "xiP = 0.1\n",
+    "muJ = -0.05\n",
+    "sigmaJ = 0.1\n",
+    "\n",
+    "cf_heston = ChFHestonModel(r, T, kappa, gamma, vbar, v0, rho)\n",
+    "cf_bates = ChFBatesModel(r, T, kappa, gamma, vbar, v0, rho, xiP, muJ, sigmaJ)\n",
+    "\n",
+    "# Note: To use these characteristic functions for pricing, you would need to implement\n",
+    "# a Fourier-based pricing method like the COS method. For demonstration, we'll just\n",
+    "# evaluate the characteristic functions at a few points.\n",
+    "\n",
+    "u_values = np.linspace(-5, 5, 100)\n",
+    "heston_values = [cf_heston(u).real for u in u_values]\n",
+    "bates_values = [cf_bates(u).real for u in u_values]\n",
+    "\n",
+    "plt.figure(figsize=(10, 6))\n",
+    "plt.plot(u_values, heston_values, label='Heston Model')\n",
+    "plt.plot(u_values, bates_values, label='Bates Model')\n",
+    "plt.title('Comparison of Heston and Bates Characteristic Functions')\n",
+    "plt.xlabel('u')\n",
+    "plt.ylabel('Re(cf(u))')\n",
+    "plt.legend()\n",
+    "plt.grid(True)\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Analysis\n",
+    "\n",
+    "Discuss how the Heston and Bates models capture market phenomena that the Black-Scholes model cannot, such as volatility smiles and skews. Analyze the impact of stochastic volatility and jumps on option prices and implied volatilities.\n",
+    "\n",
+    "Note that to fully utilize these models for option pricing, you would need to implement a Fourier-based pricing method like the COS (Cosine) method. The characteristic functions provided here are the key components for such pricing methods."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Conclusion\n",
+    "\n",
+    "This notebook has demonstrated a progressive understanding of option pricing and risk management techniques, starting from the fundamental Black-Scholes model and building up to advanced stochastic volatility models with jumps. Key skills demonstrated include:\n",
+    "\n",
+    "1. Implementation of classic option pricing models\n",
+    "2. Use of Monte Carlo methods for flexible option pricing\n",
+    "3. Calculation and application of Greeks for risk management\n",
+    "4. Pricing of exotic options\n",
+    "5. Understanding of advanced models that capture complex market dynamics\n",
+    "\n",
+    "These projects showcase proficiency in financial modeling, numerical methods, and data analysis, all crucial skills in quantitative finance. The portfolio also demonstrates the ability to analyze results critically and understand the practical implications of different models and techniques."
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.8.5"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
